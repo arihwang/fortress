@@ -1,0 +1,6 @@
+{
+  "name": "React Fortress",
+  "description": "A fun, turn-based artillery game inspired by Fortress. Two players control cute cannons on a beach, adjusting angle and power to hit their opponent while contending with wind.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
