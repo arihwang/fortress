@@ -4,7 +4,7 @@ export const SCREEN_HEIGHT = 768;
 export const GROUND_Y = SCREEN_HEIGHT - 100;
 export const GRAVITY = 0.1;
 export const WIND_FACTOR = 0.01;
-export const POWER_FACTOR = 0.15;
+export const POWER_FACTOR = 0.75 // 파워 0~20 기준;
 
 export const PLAYER_1_X = 150;
 export const PLAYER_2_X = SCREEN_WIDTH - 150;

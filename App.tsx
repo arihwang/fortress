@@ -107,7 +107,7 @@ interface ControlsProps {
 
 const Controls: React.FC<ControlsProps> = ({ player, onAngleChange, onPowerChange, onFire, disabled, isPlayer1 }) => {
   return (
-    <div className={`absolute bottom-4 p-4 bg-slate-800/70 rounded-lg w-96 text-white shadow-xl ${isPlayer1 ? 'left-4' : 'right-4'}`}>
+    <div className={`absolute top-24 p-4 bg-slate-800/80 rounded-lg w-96 text-white shadow-xl z-10 ${isPlayer1 ? 'left-4' : 'right-4'}`}>
       <h2 className="text-xl font-bold mb-2 text-center">{`Player ${player.id}`}</h2>
       <div className="space-y-3">
         <div>
@@ -127,7 +127,7 @@ const Controls: React.FC<ControlsProps> = ({ player, onAngleChange, onPowerChang
           <input
             type="range"
             min="0"
-            max="100"
+            max="20"
             value={player.power}
             onChange={(e) => onPowerChange(Number(e.target.value))}
             disabled={disabled}
@@ -189,12 +189,46 @@ const GameOverScreen: React.FC<GameOverScreenProps> = ({ winner, onReset }) => (
 );
 
 
+interface AimArrowProps {
+  player: Player;
+  isPlayer1: boolean;
+}
+
+// 현재 차례인 대포에서 조준 방향으로 뻗는 점선 화살표 (길이는 파워에 비례)
+const AimArrow: React.FC<AimArrowProps> = ({ player, isPlayer1 }) => {
+  const angleRad = (isPlayer1 ? player.angle : 180 - player.angle) * (Math.PI / 180);
+  const originX = player.x;
+  const originY = PLAYER_Y - CANNON_BARREL_WIDTH / 2;
+  const length = 60 + player.power * 30;
+  const endX = originX + Math.cos(angleRad) * length;
+  const endY = originY - Math.sin(angleRad) * length;
+  return (
+    <svg className="absolute inset-0 pointer-events-none" width={SCREEN_WIDTH} height={SCREEN_HEIGHT}>
+      <defs>
+        <marker id="aim-head" markerWidth="10" markerHeight="10" refX="6" refY="5" orient="auto">
+          <path d="M0,0 L10,5 L0,10 Z" fill="rgba(255,255,255,0.8)" />
+        </marker>
+      </defs>
+      <line
+        x1={originX}
+        y1={originY}
+        x2={endX}
+        y2={endY}
+        stroke="rgba(255,255,255,0.8)"
+        strokeWidth={2}
+        strokeDasharray="6 5"
+        markerEnd="url(#aim-head)"
+      />
+    </svg>
+  );
+};
+
 // --- MAIN APP COMPONENT ---
 
 function App() {
   const createInitialPlayers = (): [Player, Player] => [
-    { id: 1, x: PLAYER_1_X, health: INITIAL_HEALTH, angle: 45, power: 50 },
-    { id: 2, x: PLAYER_2_X, health: INITIAL_HEALTH, angle: 45, power: 50 },
+    { id: 1, x: PLAYER_1_X, health: INITIAL_HEALTH, angle: 45, power: 10 },
+    { id: 2, x: PLAYER_2_X, health: INITIAL_HEALTH, angle: 45, power: 10 },
   ];
   
   const generateWind = useCallback((): Wind => ({
@@ -210,6 +244,15 @@ function App() {
   const [explosion, setExplosion] = useState<ExplosionState | null>(null);
 
   const animationFrameId = useRef<number | null>(null);
+
+  // 창 크기에 맞춰 게임 화면 전체를 확대/축소
+  const computeScale = () => Math.min(window.innerWidth / SCREEN_WIDTH, window.innerHeight / SCREEN_HEIGHT);
+  const [scale, setScale] = useState<number>(computeScale);
+  useEffect(() => {
+    const onResize = () => setScale(computeScale());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const projectileRef = useRef<ProjectileState | null>(null);
   const playersRef = useRef(players);
   playersRef.current = players;
@@ -339,16 +382,34 @@ function App() {
   const winner = players.find(p => p.health <= 0) ? (players[0].health <= 0 ? player2 : player1) : null;
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-800">
+    <div className="flex justify-center items-center h-screen bg-gray-800 overflow-hidden">
+      <div style={{ width: SCREEN_WIDTH * scale, height: SCREEN_HEIGHT * scale }}>
       <div
         className="relative bg-gradient-to-b from-sky-400 to-sky-600"
-        style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT, overflow: 'hidden' }}
+        style={{
+          width: SCREEN_WIDTH,
+          height: SCREEN_HEIGHT,
+          overflow: 'hidden',
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          backgroundColor: '#3b8fd0',
+        }}
       >
         {/* Background elements */}
-        <div className="absolute bottom-0 left-0 w-full h-25 bg-yellow-200" style={{ height: 100, backgroundColor: '#f5deb3' }}/>
-        <div className="absolute bottom-0 left-0 w-full h-20 bg-blue-500 opacity-70" style={{ height: 80, bottom: 20 }}/>
+        {/* 격자 */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
         <div className="absolute top-20 left-40 w-24 h-12 bg-white/80 rounded-full"></div>
         <div className="absolute top-32 left-80 w-32 h-16 bg-white/70 rounded-full"></div>
+        {/* 모래사장(위) + 바다(아래) */}
+        <div className="absolute left-0 w-full" style={{ top: GROUND_Y, height: 20, backgroundColor: '#f5deb3' }} />
+        <div className="absolute left-0 w-full" style={{ top: GROUND_Y + 20, bottom: 0, backgroundColor: '#7f9cdc' }} />
 
         {/* Game elements */}
         <div className="absolute" style={{ left: player1.x, top: PLAYER_Y }}>
@@ -358,6 +419,9 @@ function App() {
             <Cannon angle={player2.angle} isFlipped={true} />
         </div>
 
+        {gameStatus === GameStatus.Aiming && (
+          <AimArrow player={currentPlayer} isPlayer1={currentPlayer.id === 1} />
+        )}
         {projectile && <Projectile x={projectile.x} y={projectile.y} />}
         {explosion && <Explosion x={explosion.x} y={explosion.y} />}
 
@@ -385,6 +449,7 @@ function App() {
             <GameOverScreen winner={winner} onReset={resetGame} />
         )}
 
+      </div>
       </div>
     </div>
   );
